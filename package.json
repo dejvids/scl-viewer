@@ -1,0 +1,61 @@
+{
+  "name": "scl-viewer",
+  "displayName": "SCL Viewer",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "scl-viewer.helloWorld",
+        "title": "Hello World"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "scl.icd",
+        "displayName": "SCL Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.icd"
+          },
+          {
+            "filenamePattern": "*.xml"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "yarn run compile && yarn run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.97.0",
+    "@types/xmldom": "^0.1.34",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.16.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "install": "^0.13.0",
+    "xmldom": "^0.6.0"
+  }
+}
