@@ -14,5 +14,6 @@ export interface DataObject {
 
 export interface SubDataObject {
     name: string;
+    typeId: string;
     doType: DataObjectType | null;
 }

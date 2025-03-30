@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { DOMParser } from 'xmldom';
 import { DataObjectType, DataObject, SubDataObject } from './models/DataObject';
 import { DataAttribute, DataAttributeType } from './models/DataAttribute';
+import { EnumType, EnumValue } from './models/EnumObject';
 import { LnType } from './models/Node';
 
 export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvider {
@@ -65,8 +66,9 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         const ied = doc.getElementsByTagName('IED')[0];
         const dataTemplate = doc.getElementsByTagName('DataTypeTemplates')[0];
 
+        const enumTypes = this.getEnumTypes(dataTemplate);
         const daTypes = this.getDaTypes(dataTemplate);
-        const doTypes = this.getDoTypes(dataTemplate, daTypes);
+        const doTypes = this.getDoTypes(dataTemplate, daTypes, enumTypes);
         const lnTypes = this.getLnTypes(dataTemplate, doTypes);
 
         const treeviewStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(
@@ -136,6 +138,33 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return lDeviceList;
     }
 
+    private getEnumTypes(dataTemplate: Element): EnumType[] {
+        var enumTypeNodes = dataTemplate.getElementsByTagName('EnumType');
+        var enumTypes: EnumType[] = [];
+        for (var i = 0; i < enumTypeNodes.length; i++) {
+            const enumTags = enumTypeNodes[i].getElementsByTagName('EnumVal');
+            const enumValues: EnumValue[] = [];
+
+            for (var j = 0; j < enumTags.length; j++) {
+                const enumValue: EnumValue = {
+                    name: enumTags[j].textContent || '',
+                    description: enumTags[j].getAttribute('desc') || ''
+                };
+                enumValues.push(enumValue);
+            }
+
+            const enumType: EnumType = {
+                id: enumTypeNodes[i].getAttribute('id') || '',
+                values: enumValues,
+                isEnumType: true
+            };
+
+            enumTypes.push(enumType);
+        }
+
+        return enumTypes;
+    }
+
     private getDaTypes(dataTemplate: Element): DataAttributeType[] {
         var daTypeNodes = dataTemplate.getElementsByTagName('DAType');
         var daTypes: DataAttributeType[] = [];
@@ -178,25 +207,29 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return daTypes;
     }
 
-    private getDoTypes(dataTemplate: Element, daTypes: DataAttributeType[]): DataObjectType[] {
+    private getDoTypes(dataTemplate: Element, daTypes: DataAttributeType[], enumTypes: EnumType[]): DataObjectType[] {
         var doTypeNodes = dataTemplate.getElementsByTagName('DOType');
-        var doTypes = [];
+        var doTypes: DataObjectType[] = [];
 
         for (var i = 0; i < doTypeNodes.length; i++) {
             const daTags = doTypeNodes[i].getElementsByTagName('DA');
             const sdoTags = doTypeNodes[i].getElementsByTagName('SDO');
             const das = [];
-
             for (var j = 0; j < daTags.length; j++) {
+                const bType = daTags[j].getAttribute('bType');
+                const daTypeId = daTags[j].getAttribute('type') || '';
                 const daElement: DataAttribute = {
                     name: daTags[j].getAttribute('name') || '',
-                    bType: daTags[j].getAttribute('bType') || '',
+                    bType: bType || '',
                     valKind: daTags[j].getAttribute('valKind') || '',
                     val: daTags[j].getAttribute('val') || '',
                     fc: daTags[j].getAttribute('fc') || '',
                     typeId: daTags[j].getAttribute('type') || null,
-                    type: daTypes.find(daType => daType.id === daTags[j].getAttribute('type')) || null
+                    type: bType === 'Enum'
+                        ? enumTypes.find(enumType => enumType.id === daTypeId) || null
+                        : daTypes.find(daType => daType.id === daTypeId) || null
                 };
+
                 das.push(daElement);
             }
 
@@ -204,7 +237,9 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             for (let j = 0; j < sdoTags.length; j++) {
                 const sdoElement: SubDataObject = {
                     name: sdoTags[j].getAttribute('name') || '',
-                    doType: doTypes.find(doType => doType.id === sdoTags[j].getAttribute('type')) || null
+                    typeId: sdoTags[j].getAttribute('type') || '',
+                    doType: null
+                    // doType: doTypes.find(doType => doType.id === sdoTags[j].getAttribute('type')) || null
                 };
                 sdos.push(sdoElement);
             }
@@ -218,6 +253,12 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
             doTypes.push(doType);
         }
+
+        doTypes.forEach(doType => {
+            doType.sdos.forEach(sdo => {
+                sdo.doType = doTypes.find(doType => doType.id === sdo.typeId) || null;
+            });
+        });
 
         return doTypes;
     }
@@ -284,7 +325,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
                 if (doType.das[k].type) {
-                    dosList += this.getDaList(doType.das[k], doType.das[k].type as DataAttributeType);
+                    dosList += this.getDaList(doType.das[k]);
                 }
                 else {
                     dosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
@@ -297,21 +338,49 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return dosList;
     }
 
-    private getDaList(dataAttribute: DataAttribute, daType: DataAttributeType) {
-        let dosList = '<li><span class="caret">DA:' + dataAttribute.name + ` [${dataAttribute.fc}]` + '</span>';
+    private getDaList(dataAttribute: DataAttribute) {
+        const daType = dataAttribute.type;
+        if (!daType) {
+            return '';
+        }
+
+        const isEnumType = daType.hasOwnProperty('isEnumType');
+
+        let dosList = '<li><span class="caret">DA:' + dataAttribute.name + ` [${dataAttribute.fc}]` + (isEnumType ? '[ENUM]' : '') + '</span>';
         dosList += '<ul class="nested">';
-        for (var l = 0; l < (daType.attributes ?? []).length; l++) {
-            if(daType.attributes[l].type){
-                dosList += this.getDaList(daType.attributes[l], daType.attributes[l].type as DataAttributeType);
+
+        if (isEnumType) { // Use the added property to check if it's an EnumType
+            if ('values' in daType) {
+                dosList += this.getEnumList(daType as EnumType);
             }
-            else{
-                dosList += '<li>' + daType.attributes[l].name + ` [${daType.attributes[l].fc}]` + '</li>';
+        }
+
+        else {
+
+
+            const dataAttributeType = daType as DataAttributeType;
+
+            for (var l = 0; l < (dataAttributeType.attributes ?? []).length; l++) {
+                if (dataAttributeType.attributes[l].type) {
+                    dosList += this.getDaList(dataAttributeType.attributes[l]);
+                }
+                else {
+                    dosList += '<li>' + dataAttributeType.attributes[l].name + ` [${dataAttributeType.attributes[l].fc}]` + '</li>';
+                }
             }
         }
 
         dosList += '</ul>';
         dosList += '</li>';
         return dosList;
+    }
+
+    private getEnumList(enumType: EnumType) {
+        let enumList: string = '';
+        for (var j = 0; j < enumType.values.length; j++) {
+            enumList += '<li>' + enumType.values[j].name + '</li>';
+        }
+        return enumList;
     }
 
     private getSDosList(doNames: SubDataObject[]) {
@@ -326,7 +395,8 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             }
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
-                sdosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
+                sdosList += this.getDaList(doType.das[k]);
+                // sdosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
             }
 
             sdosList += '</ul>';

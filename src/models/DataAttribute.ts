@@ -1,3 +1,5 @@
+import { EnumType } from "./EnumObject";
+
 export interface DataAttributeType {
     id: string;
     fc: string;
@@ -10,6 +12,6 @@ export interface DataAttribute {
     valKind: string;
     val: string;
     fc: string;
-    type: DataAttributeType | null;
+    type: DataAttributeType | EnumType | null;
     typeId: string | null;
 }
