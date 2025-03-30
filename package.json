@@ -27,7 +27,13 @@
             "filenamePattern": "*.icd"
           },
           {
-            "filenamePattern": "*.xml"
+            "filenamePattern": "*.scl"
+          },
+          {
+            "filenamePattern": "*.iid"
+          },
+          {
+            "filenamePattern": "*.scd"
           }
         ],
         "priority": "option"

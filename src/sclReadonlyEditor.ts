@@ -2,7 +2,9 @@
 
 import * as vscode from 'vscode';
 import { DOMParser } from 'xmldom';
-import { DoType, DaElement, DoElement, SdoElement, LnType } from './models/DOType';
+import { DataObjectType, DataObject, SubDataObject } from './models/DataObject';
+import { DataAttribute, DataAttributeType } from './models/DataAttribute';
+import { LnType } from './models/Node';
 
 export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvider {
 
@@ -62,8 +64,9 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
         const ied = doc.getElementsByTagName('IED')[0];
         const dataTemplate = doc.getElementsByTagName('DataTypeTemplates')[0];
-        
-        const doTypes = this.getDoTypes(dataTemplate);
+
+        const daTypes = this.getDaTypes(dataTemplate);
+        const doTypes = this.getDoTypes(dataTemplate, daTypes);
         const lnTypes = this.getLnTypes(dataTemplate, doTypes);
 
         const treeviewStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(
@@ -133,7 +136,49 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return lDeviceList;
     }
 
-    private getDoTypes(dataTemplate: Element): DoType[] {
+    private getDaTypes(dataTemplate: Element): DataAttributeType[] {
+        var daTypeNodes = dataTemplate.getElementsByTagName('DAType');
+        var daTypes: DataAttributeType[] = [];
+
+        for (var i = 0; i < daTypeNodes.length; i++) {
+            const daTags = daTypeNodes[i].getElementsByTagName('BDA');
+            const bdas = [];
+
+            for (var j = 0; j < daTags.length; j++) {
+                const bdaType: string = daTags[j].getAttribute('type') || '';
+                const bda: DataAttribute = {
+                    name: daTags[j].getAttribute('name') || '',
+                    bType: daTags[j].getAttribute('bType') || '',
+                    valKind: daTags[j].getAttribute('valKind') || '',
+                    val: '',
+                    fc: daTags[j].getAttribute('fc') || '',
+                    typeId: bdaType === '' ? null : bdaType,
+                    type: null
+                };
+                bdas.push(bda);
+            }
+
+            const daType: DataAttributeType = {
+                id: daTypeNodes[i].getAttribute('id') || '',
+                fc: daTypeNodes[i].getAttribute('fc') || '',
+                attributes: bdas
+            };
+
+            daTypes.push(daType);
+        }
+
+        daTypes.forEach(daType => {
+            daType.attributes.forEach(da => {
+                if (da.typeId) {
+                    da.type = daTypes.find(daType => daType.id === da.typeId) || null;
+                }
+            });
+        });
+
+        return daTypes;
+    }
+
+    private getDoTypes(dataTemplate: Element, daTypes: DataAttributeType[]): DataObjectType[] {
         var doTypeNodes = dataTemplate.getElementsByTagName('DOType');
         var doTypes = [];
 
@@ -143,26 +188,28 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             const das = [];
 
             for (var j = 0; j < daTags.length; j++) {
-                const daElement: DaElement = {
+                const daElement: DataAttribute = {
                     name: daTags[j].getAttribute('name') || '',
                     bType: daTags[j].getAttribute('bType') || '',
                     valKind: daTags[j].getAttribute('valKind') || '',
                     val: daTags[j].getAttribute('val') || '',
-                    fc: daTags[j].getAttribute('fc') || ''
+                    fc: daTags[j].getAttribute('fc') || '',
+                    typeId: daTags[j].getAttribute('type') || null,
+                    type: daTypes.find(daType => daType.id === daTags[j].getAttribute('type')) || null
                 };
                 das.push(daElement);
             }
 
-            const sdos: SdoElement[] = [];
+            const sdos: SubDataObject[] = [];
             for (let j = 0; j < sdoTags.length; j++) {
-                const sdoElement: SdoElement = {
+                const sdoElement: SubDataObject = {
                     name: sdoTags[j].getAttribute('name') || '',
                     doType: doTypes.find(doType => doType.id === sdoTags[j].getAttribute('type')) || null
                 };
                 sdos.push(sdoElement);
             }
 
-            const doType: DoType = {
+            const doType: DataObjectType = {
                 id: doTypeNodes[i].getAttribute('id') || '',
                 cdc: doTypeNodes[i].getAttribute('cdc') || '',
                 sdos: sdos,
@@ -175,7 +222,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return doTypes;
     }
 
-    private getLnTypes(dataTemplate: Element, doTypes: DoType[]): LnType[] {
+    private getLnTypes(dataTemplate: Element, doTypes: DataObjectType[]): LnType[] {
         var lnodeTypes = dataTemplate.getElementsByTagName('LNodeType');
         var lnTypes = [];
 
@@ -184,7 +231,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             const dos = [];
             for (var j = 0; j < doNames.length; j++) {
                 const doType = doTypes.find(doType => doType.id === doNames[j].getAttribute('type'));
-                const doElement : DoElement = {
+                const doElement: DataObject = {
                     name: doNames[j].getAttribute('name') || '',
                     type: doType || null
                 };
@@ -213,30 +260,35 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         for (var i = 0; i < lnodeTypes.length; i++) {
             lNodeTypeList += '<li><span class="caret">' + lnodeTypes[i].lnClass + ' (' + lnodeTypes[i].id + ')</span>';
             const doElements = lnodeTypes[i].dos;
-            
+
             lNodeTypeList += '<ul class="nested">';
             lNodeTypeList += this.getDosList(doElements);
             lNodeTypeList += '</ul>';
-            
+
             lNodeTypeList += '</li>';
         }
 
         return lNodeTypeList;
     }
 
-    private getDosList(doNames: DoElement[] | null) {
+    private getDosList(doNames: DataObject[] | null) {
         let dosList: string = '';
         for (var j = 0; doNames && j < doNames.length; j++) {
             const doType = doNames[j].type;
             dosList += '<li><span class="caret">DO: ' + doNames[j].name + ' (' + doType?.cdc + ')</span>';
             dosList += '<ul class="nested">';
 
-            if(doType?.sdos) {
+            if (doType?.sdos) {
                 dosList += this.getSDosList(doType?.sdos);
             }
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
-                dosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
+                if (doType.das[k].type) {
+                    dosList += this.getDaList(doType.das[k], doType.das[k].type as DataAttributeType);
+                }
+                else {
+                    dosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
+                }
             }
 
             dosList += '</ul>';
@@ -245,7 +297,24 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return dosList;
     }
 
-    private getSDosList(doNames: SdoElement[]) {
+    private getDaList(dataAttribute: DataAttribute, daType: DataAttributeType) {
+        let dosList = '<li><span class="caret">DA:' + dataAttribute.name + ` [${dataAttribute.fc}]` + '</span>';
+        dosList += '<ul class="nested">';
+        for (var l = 0; l < (daType.attributes ?? []).length; l++) {
+            if(daType.attributes[l].type){
+                dosList += this.getDaList(daType.attributes[l], daType.attributes[l].type as DataAttributeType);
+            }
+            else{
+                dosList += '<li>' + daType.attributes[l].name + ` [${daType.attributes[l].fc}]` + '</li>';
+            }
+        }
+
+        dosList += '</ul>';
+        dosList += '</li>';
+        return dosList;
+    }
+
+    private getSDosList(doNames: SubDataObject[]) {
         let sdosList: string = '';
         for (var j = 0; doNames && j < doNames.length; j++) {
             const doType = doNames[j].doType;
