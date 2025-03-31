@@ -38,3 +38,7 @@
   .active {
     display: block;
   } 
+
+  .da-type {
+    color:coral;
+  }

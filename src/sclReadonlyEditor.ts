@@ -67,7 +67,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         const dataTemplate = doc.getElementsByTagName('DataTypeTemplates')[0];
 
         const enumTypes = this.getEnumTypes(dataTemplate);
-        const daTypes = this.getDaTypes(dataTemplate);
+        const daTypes = this.getDaTypes(dataTemplate, enumTypes);
         const doTypes = this.getDoTypes(dataTemplate, daTypes, enumTypes);
         const lnTypes = this.getLnTypes(dataTemplate, doTypes);
 
@@ -165,7 +165,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         return enumTypes;
     }
 
-    private getDaTypes(dataTemplate: Element): DataAttributeType[] {
+    private getDaTypes(dataTemplate: Element, enumTypes: EnumType[]): DataAttributeType[] {
         var daTypeNodes = dataTemplate.getElementsByTagName('DAType');
         var daTypes: DataAttributeType[] = [];
 
@@ -199,7 +199,9 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         daTypes.forEach(daType => {
             daType.attributes.forEach(da => {
                 if (da.typeId) {
-                    da.type = daTypes.find(daType => daType.id === da.typeId) || null;
+                    da.type = da.bType ==='Enum' 
+                    ? enumTypes.find(enumtype => enumtype.id === da.typeId) || null 
+                    : daTypes.find(daType => daType.id === da.typeId) || null;
                 }
             });
         });
@@ -324,11 +326,15 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             }
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
-                if (doType.das[k].type) {
-                    dosList += this.getDaList(doType.das[k]);
+                const da = doType?.das[k];
+                if(!da) {
+                    continue;
+                }
+                if (da.type) {
+                    dosList += this.getDaList(da);
                 }
                 else {
-                    dosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
+                    dosList += '<li>' + da.name + ` <span class="da-type">${da.bType}</span>` + ` [${da.fc}]`  + '</li>';
                 }
             }
 
@@ -346,7 +352,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
         const isEnumType = daType.hasOwnProperty('isEnumType');
 
-        let dosList = '<li><span class="caret">DA:' + dataAttribute.name + ` [${dataAttribute.fc}]` + (isEnumType ? '[ENUM]' : '') + '</span>';
+        let dosList = '<li><span class="caret">' + dataAttribute.name  + ` <span class="da-type">${dataAttribute.bType}</span>` + (dataAttribute.fc !=='' ? ` [${dataAttribute.fc}]` : '') + '</span>';
         dosList += '<ul class="nested">';
 
         if (isEnumType) { // Use the added property to check if it's an EnumType
@@ -365,7 +371,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
                     dosList += this.getDaList(dataAttributeType.attributes[l]);
                 }
                 else {
-                    dosList += '<li>' + dataAttributeType.attributes[l].name + ` [${dataAttributeType.attributes[l].fc}]` + '</li>';
+                    dosList += '<li>' + dataAttributeType.attributes[l].name + ` <span class="da-type">${dataAttributeType.attributes[l].bType}</span>` + ` [${dataAttributeType.attributes[l].fc}]` + '</li>';
                 }
             }
         }
