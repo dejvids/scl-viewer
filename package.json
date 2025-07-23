@@ -1,8 +1,9 @@
 {
   "name": "scl-viewer",
   "displayName": "SCL Viewer",
-  "description": "",
-  "version": "0.0.1",
+  "description": "SCL Viewer is a simple parser for IEC61850 format files.It allows displaying the DataTemplate and IED as hierarchical tree views.",
+  "publisher": "dejvids",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.97.0"
   },
@@ -63,5 +64,14 @@
   "dependencies": {
     "install": "^0.13.0",
     "xmldom": "^0.6.0"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dejvids/scl-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dejvids/scl-viewer/issues"
+  },
+  "homepage": "https://github.com/dejvids/scl-viewer#readme"
 }
