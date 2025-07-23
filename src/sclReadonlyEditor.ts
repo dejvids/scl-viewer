@@ -5,7 +5,8 @@ import { DOMParser } from 'xmldom';
 import { DataObjectType, DataObject, SubDataObject } from './models/DataObject';
 import { DataAttribute, DataAttributeType } from './models/DataAttribute';
 import { EnumType, EnumValue } from './models/EnumObject';
-import { LnType } from './models/Node';
+import { LnType } from './models/LNode';
+import { Ied } from './models/Ied';
 
 export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvider {
 
@@ -63,13 +64,14 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         const parser = new DOMParser();
         const doc = parser.parseFromString(content, 'application/xml');
 
-        const ied = doc.getElementsByTagName('IED')[0];
+        const iedElements = doc.getElementsByTagName('IED');
         const dataTemplate = doc.getElementsByTagName('DataTypeTemplates')[0];
 
         const enumTypes = this.getEnumTypes(dataTemplate);
         const daTypes = this.getDaTypes(dataTemplate, enumTypes);
         const doTypes = this.getDoTypes(dataTemplate, daTypes, enumTypes);
         const lnTypes = this.getLnTypes(dataTemplate, doTypes);
+        const ieds = this.getIedsList(iedElements, lnTypes);
 
         const treeviewStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(
             this.context.extensionUri, 'media', 'treeview.css'));
@@ -91,10 +93,8 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         <body>
             <div class="container">
                 <div class="side-panel">
-                    <h2>IED ${ied.getAttribute('name')}</h2>
-                    <h3>Logical Devices</h3>
                     <ul id="iedUL">
-                        ${this.getLdevicesList(ied)}
+                        ${ieds}
                     </ul>
                 </div>
                 </hr>
@@ -110,9 +110,27 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         </body>
         </html>`;
     }
+    getIedsList(iedElements: HTMLCollectionOf<Element>, lnTypes: LnType[]) {
+        const ieds: string[] = [];
+
+        for (let i = 0; i < iedElements.length; i++) {
+            const iedElement = iedElements[i];
+            const name = iedElement.getAttribute('name') || '';
+            const lDeviceInst = this.getLdevicesList(iedElement, lnTypes);
+
+            let iedList ='<li><span class="caret">IED: ' + ' (' + name + ')</span>';
+            iedList += '<ul class="nested">';
+            iedList += lDeviceInst;
+            iedList += '</ul>';
+
+            ieds.push(iedList);
+        }
+
+        return ieds.join('\n\r');
+    }
 
 
-    private getLdevicesList(ied: Element) {
+    private getLdevicesList(ied: Element, lnTypes: LnType[]) {
         var lDevices = ied.getElementsByTagName('LDevice');
         // create a list of all the logical devices as <li> elements
         var lDeviceList = '';
@@ -123,12 +141,22 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
             // create a list of all the logical nodes as nested elements of the logical device
             lDeviceList += '<ul class="nested">';
-            lDeviceList += '<li>' + ln0[0].getAttribute('lnClass') + '</li>';
+            //lDeviceList += '<li>' + ln0[0].getAttribute('lnClass');
             for (var j = 0; j < lNodes.length; j++) {
-                const prefix = lNodes[j].getAttribute('prefix') || '';
-                const lnCLass = lNodes[j].getAttribute('lnClass') || '';
-                const inst = lNodes[j].getAttribute('inst') || '';
-                lDeviceList += `<li lnType="${lNodes[j].getAttribute('lnType')}">` + prefix + lnCLass + inst + '</li>';
+                const prefix:string = lNodes[j].getAttribute('prefix') || '';
+                const lnCLass:string = lNodes[j].getAttribute('lnClass') || '';
+                const inst:string = lNodes[j].getAttribute('inst') || '';
+                const lnType = lNodes[j].getAttribute('lnType');
+                const lnTypeObj = lnTypes.filter(lnTypeObj => lnTypeObj.id === lnType);
+                if (!lnTypeObj) {
+                    continue;
+                }
+
+                lDeviceList += '<li><span class="caret">LN: ' + prefix + ''  + lnCLass + '' + inst + '</span>';
+                lDeviceList += '<ul class="nested">';
+                lDeviceList += this.getLNodeTypeList(lnTypeObj);
+                lDeviceList += '</ul>';
+                lDeviceList += '</li>';
             }
 
             lDeviceList += '</ul>';

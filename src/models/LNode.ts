@@ -7,3 +7,8 @@ export interface LnType {
     inst: string;
     dos: DataObject[] | null;
 }
+
+export interface LnInstance {
+    name: string;
+    type: LnType | null;
+}
