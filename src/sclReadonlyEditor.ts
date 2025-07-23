@@ -6,7 +6,6 @@ import { DataObjectType, DataObject, SubDataObject } from './models/DataObject';
 import { DataAttribute, DataAttributeType } from './models/DataAttribute';
 import { EnumType, EnumValue } from './models/EnumObject';
 import { LnType } from './models/LNode';
-import { Ied } from './models/Ied';
 
 export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvider {
 
@@ -118,7 +117,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             const name = iedElement.getAttribute('name') || '';
             const lDeviceInst = this.getLdevicesList(iedElement, lnTypes);
 
-            let iedList ='<li><span class="caret">IED: ' + ' (' + name + ')</span>';
+            let iedList = '<li><span class="caret">IED: ' + ' (' + name + ')</span>';
             iedList += '<ul class="nested">';
             iedList += lDeviceInst;
             iedList += '</ul>';
@@ -143,16 +142,16 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             lDeviceList += '<ul class="nested">';
             //lDeviceList += '<li>' + ln0[0].getAttribute('lnClass');
             for (var j = 0; j < lNodes.length; j++) {
-                const prefix:string = lNodes[j].getAttribute('prefix') || '';
-                const lnCLass:string = lNodes[j].getAttribute('lnClass') || '';
-                const inst:string = lNodes[j].getAttribute('inst') || '';
+                const prefix: string = lNodes[j].getAttribute('prefix') || '';
+                const lnCLass: string = lNodes[j].getAttribute('lnClass') || '';
+                const inst: string = lNodes[j].getAttribute('inst') || '';
                 const lnType = lNodes[j].getAttribute('lnType');
                 const lnTypeObj = lnTypes.filter(lnTypeObj => lnTypeObj.id === lnType);
                 if (!lnTypeObj) {
                     continue;
                 }
 
-                lDeviceList += '<li><span class="caret">LN: ' + prefix + ''  + lnCLass + '' + inst + '</span>';
+                lDeviceList += '<li><span class="caret">LN: ' + prefix + '' + lnCLass + '' + inst + '</span>';
                 lDeviceList += '<ul class="nested">';
                 lDeviceList += this.getLNodeTypeList(lnTypeObj);
                 lDeviceList += '</ul>';
@@ -227,9 +226,9 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         daTypes.forEach(daType => {
             daType.attributes.forEach(da => {
                 if (da.typeId) {
-                    da.type = da.bType ==='Enum' 
-                    ? enumTypes.find(enumtype => enumtype.id === da.typeId) || null 
-                    : daTypes.find(daType => daType.id === da.typeId) || null;
+                    da.type = da.bType === 'Enum'
+                        ? enumTypes.find(enumtype => enumtype.id === da.typeId) || null
+                        : daTypes.find(daType => daType.id === da.typeId) || null;
                 }
             });
         });
@@ -355,21 +354,28 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
                 const da = doType?.das[k];
-                if(!da) {
+                if (!da) {
                     continue;
                 }
-                if (da.type) {
-                    dosList += this.getDaList(da);
-                }
-                else {
-                    dosList += '<li>' + da.name + ` <span class="da-type">${da.bType}</span>` + ` [${da.fc}]`  + '</li>';
-                }
+                dosList += this.createDaElement(da);
             }
 
             dosList += '</ul>';
             dosList += '</li>';
         }
         return dosList;
+    }
+
+    private createDaElement(da: DataAttribute): string {
+        let element = '';
+        if (da.type) {
+            element += this.getDaList(da);
+        }
+        else {
+            element += '<li>' + da.name + ` <span class="da-type">${da.bType}</span>` + ` [${da.fc}]` + '</li>';
+        }
+
+        return element;
     }
 
     private getDaList(dataAttribute: DataAttribute) {
@@ -380,7 +386,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
 
         const isEnumType = daType.hasOwnProperty('isEnumType');
 
-        let dosList = '<li><span class="caret">' + dataAttribute.name  + ` <span class="da-type">${dataAttribute.bType}</span>` + (dataAttribute.fc !=='' ? ` [${dataAttribute.fc}]` : '') + '</span>';
+        let dosList = '<li><span class="caret">' + dataAttribute.name + ` <span class="da-type">${dataAttribute.bType}</span>` + (dataAttribute.fc !== '' ? ` [${dataAttribute.fc}]` : '') + '</span>';
         dosList += '<ul class="nested">';
 
         if (isEnumType) { // Use the added property to check if it's an EnumType
@@ -390,8 +396,6 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
         }
 
         else {
-
-
             const dataAttributeType = daType as DataAttributeType;
 
             for (var l = 0; l < (dataAttributeType.attributes ?? []).length; l++) {
@@ -429,8 +433,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
             }
 
             for (var k = 0; doType && doType.das && k < doType.das.length; k++) {
-                sdosList += this.getDaList(doType.das[k]);
-                // sdosList += '<li>' + doType?.das[k].name + ` [${doType?.das[k].fc}]` + '</li>';
+                sdosList += this.createDaElement(doType.das[k]);
             }
 
             sdosList += '</ul>';
@@ -450,10 +453,7 @@ export class SclReadonlyEditorProvider implements vscode.CustomTextEditorProvide
     private updateTextDocument(document: vscode.TextDocument, json: string) {
         const edit = new vscode.WorkspaceEdit();
 
-        // Just replace the entire document every time for this example extension.
-        // A more complete extension should compute minimal edits instead.
-        let resource = edit.get(document.uri);
-
+        // Replace the entire content of the document with the new JSON
         edit.replace(
             document.uri,
             new vscode.Range(0, 0, document.lineCount, 0),

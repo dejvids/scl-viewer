@@ -21,12 +21,6 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(SclReadonlyEditorProvider.register(context));
-	// context.subscriptions.push(disposable);
-	// vscode.window.registerCustomEditorProvider('scl-viewer.scl', {
-	// 	resolveCustomTextEditor(document: vscode.TextDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken) {
-	// 		webviewPanel.webview.html = getWebviewContent(document.getText());
-	// 	}
-	// });
 }
 
 // This method is called when your extension is deactivated
